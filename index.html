@@ -60,7 +60,7 @@
   .pin:active{transform:scale(0.88);}
   .pin[hidden]{display:none;}
 
-  /* ---------- Hill shaped info button ---------- */
+  /* ---------- Hill info button ---------- */
   .hill-btn{
     position:fixed; right:calc(16px + var(--safe-r)); bottom:calc(var(--bar-h) + 20px + var(--safe-b));
     z-index:22; width:54px; height:54px; border-radius:50%;
@@ -160,6 +160,35 @@
   .info-dots{display:flex; justify-content:center; gap:8px; padding:8px 0 6px;}
   .info-dots .dot{width:7px; height:7px; border-radius:50%; background:var(--line); cursor:pointer; padding:6px; margin:-6px; background-clip:content-box;}
   .info-dots .dot.active{background:var(--ink); background-clip:content-box;}
+
+  /* ---------- Glossary terms (MGA, cru) ---------- */
+  .gloss-term{
+    color:var(--gold); border-bottom:1px dotted var(--gold);
+    cursor:pointer; font-weight:600;
+  }
+  .gloss-term:active{color:var(--gold-bright);}
+  .gloss-popup{
+    position:absolute; z-index:60; max-width:240px;
+    background:var(--paper); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.28);
+    padding:10px 12px; font-family:'Inter',sans-serif;
+    opacity:0; transform:translateY(4px); pointer-events:none;
+    transition:opacity 0.15s ease, transform 0.15s ease;
+  }
+  .gloss-popup.visible{opacity:1; transform:translateY(0); pointer-events:auto;}
+  .gloss-popup-title{
+    font-family:'Cormorant', serif; font-weight:700; font-size:15px;
+    color:var(--ink); margin:0 0 4px; padding-right:16px;
+  }
+  .gloss-popup-body{
+    font-family:'Cormorant Garamond', serif; font-size:13.5px; line-height:1.45;
+    color:var(--ink-soft); margin:0;
+  }
+  .gloss-popup-close{
+    position:absolute; top:6px; right:7px; width:18px; height:18px; border-radius:50%;
+    border:none; background:rgba(43,36,32,0.08); color:var(--ink); font-size:12px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+  }
 </style>
 </head>
 <body>
@@ -226,18 +255,7 @@ const EMBEDDED_HEIGHTMAP = {"gridSize": 110, "minElevationMeters": 101.0, "maxEl
 </script>
 <script>
 // ---------------------------------------------------------------
-// REGIONS: three real cru polygons (Bussia, Dolcetto, Pugnane),
-// surveyed as lat/long vertices and converted here to local terrain
-// metres via EPSG:32632 (UTM 32N) — the same CRS as the source .tif
-// GEO.py reads. The reference frame is the raster window GEO.py
-// actually ends up reading: BBOX reprojected to EPSG:32632, then
-// clipped by rasterio to the .tif's real extent (left=417265,
-// right=417625, bottom=4941345.64, top=4941805.64 — 360m x 460m,
-// see FOOTPRINT_WIDTH/FOOTPRINT_DEPTH below). +X = east, +Z = south,
-// centered on that window — matching the terrain's own world axes
-// (see buildTerrain/tryPlacePin). Dolcetto's true plot extends
-// ~15-20m past the raster's west edge (no elevation data there), so
-// its polygon below is clipped to the covered portion.
+// REGIONS: four real wine polygons (Bussia, Dolcetto, Pugnane, Nebbiolo),
 // ---------------------------------------------------------------
 const REGIONS = {
 
@@ -249,38 +267,16 @@ const REGIONS = {
 <strong>Pruning and training system:</strong> Traditional Guyot<br>
 <strong>Colour:</strong> Bright ruby with purple hues<br>
 <strong>Aroma:</strong> Intense and persistent, with a distinctly vinous character, floral and fruity notes, especially characteristic cherry, complemented by delicate sweet spices.<br>
-<strong>Palate:</strong> Echoes the aromas of the nose, balanced by pleasant acidity and a delicate, inviting bitter note.`,
+<strong>Palate:</strong> Echoes the aromas of the scent, balanced by pleasant acidity and a delicate, inviting bitter note.`,
     color: 0x7A2E52, // ruby with violet hues
-    // Two of the surveyed corners fall north of GEO.py's BBOX (the raster
-    // crop used for the heightmap), so they're clamped to the model's
-    // north edge (z = -230) rather than extrapolated past the terrain.
     polygon: [
-      [-46.66, -133.14],
-      [-20.71, -109.79],
-      [45.82, -230.00],
-      [40.96, -230.00]
+      [-99.35, -131.97],
+      [-62.43, -108.44],
+      [28.33, -283.71],
+      [35.83, -319.71]
     ]
   },
 
-  pugnane: {
-    key: 'pugnane',
-    label: 'Barolo',
-    wine: 'Barolo D.O.C.G. Pugnane',
-    note: `<strong>Location:</strong> Castiglione Falletto<br>
-<strong>Exposure:</strong> South, South-East<br>
-<strong>Soil:</strong> Marl, clay and limestone<br>
-<strong>Pruning and training system:</strong> Traditional Guyot<br>
-<strong>Colour:</strong> Bright, transparent ruby to garnet red<br>
-<strong>Aroma:</strong> Complex and broad, fresh and youthful, with notes of violet and woodland. Subtle hints of oak from ageing in wood are complemented by a delicate touch of liquorice and the characteristic vinous aromas of Nebbiolo.<br>
-<strong>Palate:</strong> Dry and harmonious, with well-balanced tannins and a smooth, silky texture. Fresh and elegant, with a pleasant, well-rounded finish.`,
-    color: 0x9E3F4A, // light garnet
-    polygon: [
-      [32.52, -88.45],
-      [82.26, -92.52],
-      [72.47, 100.42],
-      [38.12, 115.66]
-    ]
-  },
 
   bussia: {
     key: 'bussia',
@@ -295,10 +291,30 @@ const REGIONS = {
 <strong>Palate:</strong> Fresh, smooth and enveloping, with pleasant acidity and a warm, rounded texture. Dominant cherry notes lead to a distinctive finish of bitter almond.`,
     color: 0xA84648, // light garnet
     polygon: [
-      [-73.28, 113.70],
-      [-0.38, 94.34],
-      [40.96, -230.00],
-      [38.12, -210.33]
+      [-140.67, 111.11],
+      [-35.84, 93.40],
+      [23.32, -206.59],
+      [28.33, -283.71]
+    ]
+  },
+ 
+  pugnane: {
+    key: 'pugnane',
+    label: 'Barolo',
+    wine: 'Barolo D.O.C.G. Pugnane',
+    note: `<strong>Location:</strong> Castiglione Falletto<br>
+<strong>Exposure:</strong> South, South-East<br>
+<strong>Soil:</strong> Marl, clay and limestone<br>
+<strong>Pruning and training system:</strong> Traditional Guyot<br>
+<strong>Colour:</strong> Bright, transparent ruby to garnet red<br>
+<strong>Aroma:</strong> Complex and broad, fresh and youthful, with notes of violet and woodland. Subtle hints of oak from ageing in wood are complemented by a delicate touch of liquorice, without eclipsing the characteristic vinous aromas of Nebbiolo.<br>
+<strong>Palate:</strong> Dry and harmonious, with well-balanced tannins and a smooth, silky texture. Fresh and elegant, with a pleasant, well-rounded finish.`,
+    color: 0x9E3F4A, // light garnet
+    polygon: [
+      [13.74, -86.42],
+      [85.19, -89.51],
+      [68.68, 100.75],
+      [19.21, 115.16]
     ]
   },
 
@@ -306,13 +322,13 @@ const REGIONS = {
     key: 'nebbiolo',
     label: 'Nebbiolo',
     wine: 'Langhe Nebbiolo',
-    note: ``, // TODO: fill in location/exposure/soil/aroma/palate notes
-    color: 0x8C6239, // hazelnut brown — this plot was once a hazelnut grove
+    note: `<strong>Location:</strong> Castiglione Falletto`,
+    color: 0x8B5E3C, // hazelnut brown
     polygon: [
-      [78.05, 97.38],
-      [108.87, 79.11],
-      [82.26, -91.49],
-      [94.20, -99.64]
+      [76.77, 97.85],
+      [121.25, 80.37],
+      [102.38, -96.31],
+      [85.18, -88.51]
     ]
   }
 
@@ -332,7 +348,7 @@ function pointInPolygon(x, z, polygon){
 }
 
 // Returns the cru region containing world-space (x, z), or null if the
-// point falls outside all three surveyed cru polygons.
+// point falls outside all four surveyed cru polygons.
 function regionForPoint(x, z){
   for (const key of ['bussia', 'dolcetto', 'pugnane', 'nebbiolo']){
     if (pointInPolygon(x, z, REGIONS[key].polygon)) return REGIONS[key];
@@ -722,11 +738,11 @@ sheetInfoBtn.addEventListener('click', (e) => { e.stopPropagation(); openSheet()
 sheetBar.addEventListener('click', openSheet);
 
 // =================================================================
-// Info card: overview + 3 cru pages, swipeable with dot navigation.
+// Info card: overview + 3 wine pages, swipeable with dot navigation.
 // =================================================================
 const OVERVIEW_HTML = `
   <p>The <strong>Pugnane Hill</strong>, located in Castiglione Falletto, Piedmont, rises between <strong>250 and 350 metres above sea level</strong>. Its predominant exposure is <strong>west and south-west</strong>.
-  The hill is recognised as an <strong>MGA</strong> and its terroir includes the <strong>Bussia</strong> cru.</p>
+  The hill is recognised as an <strong><span class="gloss-term" data-gloss="mga">MGA</span></strong> and its terroir includes the <strong>Bussia</strong> <span class="gloss-term" data-gloss="cru">cru</span>.</p>
   <p>Two indigenous red grape varieties are cultivated on the hill: <strong>Nebbiolo</strong>, the noble variety used to produce Barolo, and <strong>Dolcetto</strong>.</p>
   <p>The map illustrates the characteristics of the terroir through two colour scales, switchable from the button top-right.</p>
   <p><strong>Exposure:</strong> the lighter red areas indicate southern exposures, while the darker purple areas represent northern exposures.<br>
@@ -821,6 +837,88 @@ modeToggle.addEventListener('click', () => {
   recolorTerrain();
   updateModeSwatch();
 });
+
+// =================================================================
+// Glossary popups (MGA, cru) — Overview text only
+// =================================================================
+const GLOSSARY = {
+  mga: {
+    title: 'MGA',
+    body: 'A Menzione Geografica Aggiuntiva (MGA) is an official, smaller geographic subzone inside an Italian wine designation (DOC or DOCG). It identifies a specific place, hill, or historical vineyard area.'
+  },
+  cru: {
+    title: 'Cru',
+    body: 'The French word cru means "growth" or "grown". In wine terminology, it refers to a specific vineyard, a group of vineyards, or a wine-growing region recognized for producing exceptional quality due to its unique soil, climate, and terrain (terroir).'
+  }
+};
+
+const glossPopup = document.createElement('div');
+glossPopup.className = 'gloss-popup';
+glossPopup.innerHTML = `
+  <button class="gloss-popup-close" aria-label="Close">&times;</button>
+  <p class="gloss-popup-title"></p>
+  <p class="gloss-popup-body"></p>
+`;
+document.body.appendChild(glossPopup);
+const glossPopupTitle = glossPopup.querySelector('.gloss-popup-title');
+const glossPopupBody = glossPopup.querySelector('.gloss-popup-body');
+const glossPopupClose = glossPopup.querySelector('.gloss-popup-close');
+
+function hideGlossPopup(){
+  glossPopup.classList.remove('visible');
+}
+
+function showGlossPopup(term, anchorEl){
+  const entry = GLOSSARY[term];
+  if (!entry) return;
+  glossPopupTitle.textContent = entry.title;
+  glossPopupBody.textContent = entry.body;
+
+  const rect = anchorEl.getBoundingClientRect();
+  glossPopup.classList.add('visible');
+  // Measure after making visible (but still transparent) so we can size it.
+  const popW = glossPopup.offsetWidth;
+  const popH = glossPopup.offsetHeight;
+
+  let left = rect.left + rect.width / 2 - popW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
+
+  let top = rect.bottom + 8;
+  if (top + popH > window.innerHeight - 8) {
+    top = rect.top - popH - 8;
+  }
+
+  glossPopup.style.left = `${left}px`;
+  glossPopup.style.top = `${top}px`;
+}
+
+infoPagesEl.addEventListener('click', (e) => {
+  const term = e.target.closest('.gloss-term');
+  if (!term) return;
+  e.stopPropagation();
+  const key = term.dataset.gloss;
+  const isSame = glossPopup.classList.contains('visible') && glossPopup.dataset.openTerm === key;
+  if (isSame) {
+    hideGlossPopup();
+  } else {
+    glossPopup.dataset.openTerm = key;
+    showGlossPopup(key, term);
+  }
+});
+
+glossPopupClose.addEventListener('click', (e) => {
+  e.stopPropagation();
+  hideGlossPopup();
+});
+
+document.addEventListener('click', (e) => {
+  if (!glossPopup.classList.contains('visible')) return;
+  if (glossPopup.contains(e.target) || e.target.closest('.gloss-term')) return;
+  hideGlossPopup();
+});
+
+infoPagesEl.addEventListener('scroll', hideGlossPopup);
+window.addEventListener('resize', hideGlossPopup);
 
 // =================================================================
 // Boot
